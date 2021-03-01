@@ -7,8 +7,7 @@ https://js.plainenglish.io/deploy-serverless-app-with-next-js-8-aws-lambda-and-c
 
 https://www.serverless.com/blog/serverless-nextjs
 
-serverless deploy -v
-
-serverless remove
+npx serverless
+npx serverless remove
 
 aws s3 rb s3://resume-site-assets-dev --force --devProfile
