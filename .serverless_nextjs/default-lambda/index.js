@@ -180,7 +180,10 @@ const defaultOptions = {
   enableHTTPCompression: false
 };
 
-const handler = (event, { enableHTTPCompression } = defaultOptions) => {
+const handler = (
+  event,
+  { enableHTTPCompression, rewrittenUri } = defaultOptions
+) => {
   const { request: cfRequest, response: cfResponse = { headers: {} } } = event;
 
   const response = {
@@ -190,7 +193,7 @@ const handler = (event, { enableHTTPCompression } = defaultOptions) => {
   const newStream = new Stream__default['default'].Readable();
 
   const req = Object.assign(newStream, http__default['default'].IncomingMessage.prototype);
-  req.url = cfRequest.uri;
+  req.url = rewrittenUri || cfRequest.uri;
   req.method = cfRequest.method;
   req.rawHeaders = [];
   req.headers = {};
@@ -324,6 +327,580 @@ handler.SPECIAL_NODE_HEADERS = specialNodeHeaders;
 
 var nextAwsCloudfront = handler;
 
+/**
+ * Tokenize input string.
+ */
+function lexer(str) {
+    var tokens = [];
+    var i = 0;
+    while (i < str.length) {
+        var char = str[i];
+        if (char === "*" || char === "+" || char === "?") {
+            tokens.push({ type: "MODIFIER", index: i, value: str[i++] });
+            continue;
+        }
+        if (char === "\\") {
+            tokens.push({ type: "ESCAPED_CHAR", index: i++, value: str[i++] });
+            continue;
+        }
+        if (char === "{") {
+            tokens.push({ type: "OPEN", index: i, value: str[i++] });
+            continue;
+        }
+        if (char === "}") {
+            tokens.push({ type: "CLOSE", index: i, value: str[i++] });
+            continue;
+        }
+        if (char === ":") {
+            var name = "";
+            var j = i + 1;
+            while (j < str.length) {
+                var code = str.charCodeAt(j);
+                if (
+                // `0-9`
+                (code >= 48 && code <= 57) ||
+                    // `A-Z`
+                    (code >= 65 && code <= 90) ||
+                    // `a-z`
+                    (code >= 97 && code <= 122) ||
+                    // `_`
+                    code === 95) {
+                    name += str[j++];
+                    continue;
+                }
+                break;
+            }
+            if (!name)
+                throw new TypeError("Missing parameter name at " + i);
+            tokens.push({ type: "NAME", index: i, value: name });
+            i = j;
+            continue;
+        }
+        if (char === "(") {
+            var count = 1;
+            var pattern = "";
+            var j = i + 1;
+            if (str[j] === "?") {
+                throw new TypeError("Pattern cannot start with \"?\" at " + j);
+            }
+            while (j < str.length) {
+                if (str[j] === "\\") {
+                    pattern += str[j++] + str[j++];
+                    continue;
+                }
+                if (str[j] === ")") {
+                    count--;
+                    if (count === 0) {
+                        j++;
+                        break;
+                    }
+                }
+                else if (str[j] === "(") {
+                    count++;
+                    if (str[j + 1] !== "?") {
+                        throw new TypeError("Capturing groups are not allowed at " + j);
+                    }
+                }
+                pattern += str[j++];
+            }
+            if (count)
+                throw new TypeError("Unbalanced pattern at " + i);
+            if (!pattern)
+                throw new TypeError("Missing pattern at " + i);
+            tokens.push({ type: "PATTERN", index: i, value: pattern });
+            i = j;
+            continue;
+        }
+        tokens.push({ type: "CHAR", index: i, value: str[i++] });
+    }
+    tokens.push({ type: "END", index: i, value: "" });
+    return tokens;
+}
+/**
+ * Parse a string for the raw tokens.
+ */
+function parse(str, options) {
+    if (options === void 0) { options = {}; }
+    var tokens = lexer(str);
+    var _a = options.prefixes, prefixes = _a === void 0 ? "./" : _a;
+    var defaultPattern = "[^" + escapeString(options.delimiter || "/#?") + "]+?";
+    var result = [];
+    var key = 0;
+    var i = 0;
+    var path = "";
+    var tryConsume = function (type) {
+        if (i < tokens.length && tokens[i].type === type)
+            return tokens[i++].value;
+    };
+    var mustConsume = function (type) {
+        var value = tryConsume(type);
+        if (value !== undefined)
+            return value;
+        var _a = tokens[i], nextType = _a.type, index = _a.index;
+        throw new TypeError("Unexpected " + nextType + " at " + index + ", expected " + type);
+    };
+    var consumeText = function () {
+        var result = "";
+        var value;
+        // tslint:disable-next-line
+        while ((value = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR"))) {
+            result += value;
+        }
+        return result;
+    };
+    while (i < tokens.length) {
+        var char = tryConsume("CHAR");
+        var name = tryConsume("NAME");
+        var pattern = tryConsume("PATTERN");
+        if (name || pattern) {
+            var prefix = char || "";
+            if (prefixes.indexOf(prefix) === -1) {
+                path += prefix;
+                prefix = "";
+            }
+            if (path) {
+                result.push(path);
+                path = "";
+            }
+            result.push({
+                name: name || key++,
+                prefix: prefix,
+                suffix: "",
+                pattern: pattern || defaultPattern,
+                modifier: tryConsume("MODIFIER") || ""
+            });
+            continue;
+        }
+        var value = char || tryConsume("ESCAPED_CHAR");
+        if (value) {
+            path += value;
+            continue;
+        }
+        if (path) {
+            result.push(path);
+            path = "";
+        }
+        var open = tryConsume("OPEN");
+        if (open) {
+            var prefix = consumeText();
+            var name_1 = tryConsume("NAME") || "";
+            var pattern_1 = tryConsume("PATTERN") || "";
+            var suffix = consumeText();
+            mustConsume("CLOSE");
+            result.push({
+                name: name_1 || (pattern_1 ? key++ : ""),
+                pattern: name_1 && !pattern_1 ? defaultPattern : pattern_1,
+                prefix: prefix,
+                suffix: suffix,
+                modifier: tryConsume("MODIFIER") || ""
+            });
+            continue;
+        }
+        mustConsume("END");
+    }
+    return result;
+}
+/**
+ * Compile a string to a template function for the path.
+ */
+function compile(str, options) {
+    return tokensToFunction(parse(str, options), options);
+}
+/**
+ * Expose a method for transforming tokens into the path function.
+ */
+function tokensToFunction(tokens, options) {
+    if (options === void 0) { options = {}; }
+    var reFlags = flags(options);
+    var _a = options.encode, encode = _a === void 0 ? function (x) { return x; } : _a, _b = options.validate, validate = _b === void 0 ? true : _b;
+    // Compile all the tokens into regexps.
+    var matches = tokens.map(function (token) {
+        if (typeof token === "object") {
+            return new RegExp("^(?:" + token.pattern + ")$", reFlags);
+        }
+    });
+    return function (data) {
+        var path = "";
+        for (var i = 0; i < tokens.length; i++) {
+            var token = tokens[i];
+            if (typeof token === "string") {
+                path += token;
+                continue;
+            }
+            var value = data ? data[token.name] : undefined;
+            var optional = token.modifier === "?" || token.modifier === "*";
+            var repeat = token.modifier === "*" || token.modifier === "+";
+            if (Array.isArray(value)) {
+                if (!repeat) {
+                    throw new TypeError("Expected \"" + token.name + "\" to not repeat, but got an array");
+                }
+                if (value.length === 0) {
+                    if (optional)
+                        continue;
+                    throw new TypeError("Expected \"" + token.name + "\" to not be empty");
+                }
+                for (var j = 0; j < value.length; j++) {
+                    var segment = encode(value[j], token);
+                    if (validate && !matches[i].test(segment)) {
+                        throw new TypeError("Expected all \"" + token.name + "\" to match \"" + token.pattern + "\", but got \"" + segment + "\"");
+                    }
+                    path += token.prefix + segment + token.suffix;
+                }
+                continue;
+            }
+            if (typeof value === "string" || typeof value === "number") {
+                var segment = encode(String(value), token);
+                if (validate && !matches[i].test(segment)) {
+                    throw new TypeError("Expected \"" + token.name + "\" to match \"" + token.pattern + "\", but got \"" + segment + "\"");
+                }
+                path += token.prefix + segment + token.suffix;
+                continue;
+            }
+            if (optional)
+                continue;
+            var typeOfMessage = repeat ? "an array" : "a string";
+            throw new TypeError("Expected \"" + token.name + "\" to be " + typeOfMessage);
+        }
+        return path;
+    };
+}
+/**
+ * Create path match function from `path-to-regexp` spec.
+ */
+function match(str, options) {
+    var keys = [];
+    var re = pathToRegexp(str, keys, options);
+    return regexpToFunction(re, keys, options);
+}
+/**
+ * Create a path match function from `path-to-regexp` output.
+ */
+function regexpToFunction(re, keys, options) {
+    if (options === void 0) { options = {}; }
+    var _a = options.decode, decode = _a === void 0 ? function (x) { return x; } : _a;
+    return function (pathname) {
+        var m = re.exec(pathname);
+        if (!m)
+            return false;
+        var path = m[0], index = m.index;
+        var params = Object.create(null);
+        var _loop_1 = function (i) {
+            // tslint:disable-next-line
+            if (m[i] === undefined)
+                return "continue";
+            var key = keys[i - 1];
+            if (key.modifier === "*" || key.modifier === "+") {
+                params[key.name] = m[i].split(key.prefix + key.suffix).map(function (value) {
+                    return decode(value, key);
+                });
+            }
+            else {
+                params[key.name] = decode(m[i], key);
+            }
+        };
+        for (var i = 1; i < m.length; i++) {
+            _loop_1(i);
+        }
+        return { path: path, index: index, params: params };
+    };
+}
+/**
+ * Escape a regular expression string.
+ */
+function escapeString(str) {
+    return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
+}
+/**
+ * Get the flags for a regexp from the options.
+ */
+function flags(options) {
+    return options && options.sensitive ? "" : "i";
+}
+/**
+ * Pull out keys from a regexp.
+ */
+function regexpToRegexp(path, keys) {
+    if (!keys)
+        return path;
+    // Use a negative lookahead to match only capturing groups.
+    var groups = path.source.match(/\((?!\?)/g);
+    if (groups) {
+        for (var i = 0; i < groups.length; i++) {
+            keys.push({
+                name: i,
+                prefix: "",
+                suffix: "",
+                modifier: "",
+                pattern: ""
+            });
+        }
+    }
+    return path;
+}
+/**
+ * Transform an array into a regexp.
+ */
+function arrayToRegexp(paths, keys, options) {
+    var parts = paths.map(function (path) { return pathToRegexp(path, keys, options).source; });
+    return new RegExp("(?:" + parts.join("|") + ")", flags(options));
+}
+/**
+ * Create a path regexp from string input.
+ */
+function stringToRegexp(path, keys, options) {
+    return tokensToRegexp(parse(path, options), keys, options);
+}
+/**
+ * Expose a function for taking tokens and returning a RegExp.
+ */
+function tokensToRegexp(tokens, keys, options) {
+    if (options === void 0) { options = {}; }
+    var _a = options.strict, strict = _a === void 0 ? false : _a, _b = options.start, start = _b === void 0 ? true : _b, _c = options.end, end = _c === void 0 ? true : _c, _d = options.encode, encode = _d === void 0 ? function (x) { return x; } : _d;
+    var endsWith = "[" + escapeString(options.endsWith || "") + "]|$";
+    var delimiter = "[" + escapeString(options.delimiter || "/#?") + "]";
+    var route = start ? "^" : "";
+    // Iterate over the tokens and create our regexp string.
+    for (var _i = 0, tokens_1 = tokens; _i < tokens_1.length; _i++) {
+        var token = tokens_1[_i];
+        if (typeof token === "string") {
+            route += escapeString(encode(token));
+        }
+        else {
+            var prefix = escapeString(encode(token.prefix));
+            var suffix = escapeString(encode(token.suffix));
+            if (token.pattern) {
+                if (keys)
+                    keys.push(token);
+                if (prefix || suffix) {
+                    if (token.modifier === "+" || token.modifier === "*") {
+                        var mod = token.modifier === "*" ? "?" : "";
+                        route += "(?:" + prefix + "((?:" + token.pattern + ")(?:" + suffix + prefix + "(?:" + token.pattern + "))*)" + suffix + ")" + mod;
+                    }
+                    else {
+                        route += "(?:" + prefix + "(" + token.pattern + ")" + suffix + ")" + token.modifier;
+                    }
+                }
+                else {
+                    route += "(" + token.pattern + ")" + token.modifier;
+                }
+            }
+            else {
+                route += "(?:" + prefix + suffix + ")" + token.modifier;
+            }
+        }
+    }
+    if (end) {
+        if (!strict)
+            route += delimiter + "?";
+        route += !options.endsWith ? "$" : "(?=" + endsWith + ")";
+    }
+    else {
+        var endToken = tokens[tokens.length - 1];
+        var isEndDelimited = typeof endToken === "string"
+            ? delimiter.indexOf(endToken[endToken.length - 1]) > -1
+            : // tslint:disable-next-line
+                endToken === undefined;
+        if (!strict) {
+            route += "(?:" + delimiter + "(?=" + endsWith + "))?";
+        }
+        if (!isEndDelimited) {
+            route += "(?=" + delimiter + "|" + endsWith + ")";
+        }
+    }
+    return new RegExp(route, flags(options));
+}
+/**
+ * Normalize the given path string, returning a regular expression.
+ *
+ * An empty array can be passed in for the keys, which will hold the
+ * placeholder key descriptions. For example, using `/user/:id`, `keys` will
+ * contain `[{ name: 'id', delimiter: '/', optional: false, repeat: false }]`.
+ */
+function pathToRegexp(path, keys, options) {
+    if (path instanceof RegExp)
+        return regexpToRegexp(path, keys);
+    if (Array.isArray(path))
+        return arrayToRegexp(path, keys, options);
+    return stringToRegexp(path, keys, options);
+}
+
+/**
+ Provides matching capabilities to support custom redirects, rewrites, and headers.
+ */
+/**
+ * Match the given path against a source path.
+ * @param path
+ * @param source
+ */
+function matchPath(path, source) {
+    const matcher = match(source, { decode: decodeURIComponent });
+    return matcher(path);
+}
+/**
+ * Compile a destination for redirects or rewrites.
+ * @param destination
+ * @param params
+ */
+function compileDestination(destination, params) {
+    try {
+        const destinationLowerCase = destination.toLowerCase();
+        if (destinationLowerCase.startsWith("https://") ||
+            destinationLowerCase.startsWith("http://")) {
+            // Handle external URLs
+            const { origin, pathname } = new URL(destination);
+            const toPath = compile(pathname, { encode: encodeURIComponent });
+            const compiledDestination = `${origin}${toPath(params)}`;
+            // Remove trailing slash if original destination didn't have it
+            if (!destination.endsWith("/") && compiledDestination.endsWith("/")) {
+                return compiledDestination.slice(0, -1);
+            }
+            else {
+                return compiledDestination;
+            }
+        }
+        else {
+            // Handle all other paths. Escape all ? in case of query parameters
+            const escapedDestination = destination.replace(/\?/g, "\\?");
+            const toPath = compile(escapedDestination, {
+                encode: encodeURIComponent
+            });
+            return toPath(params);
+        }
+    }
+    catch (error) {
+        console.error(`Could not compile destination ${destination}, returning null instead. Error: ${error}`);
+        return null;
+    }
+}
+
+/**
+ * Get the redirect of the given path, if it exists. Otherwise return null.
+ * @param path
+ * @param routesManifest
+ */
+function getRedirectPath(path, routesManifest) {
+    const redirects = routesManifest.redirects;
+    for (const redirect of redirects) {
+        const match = matchPath(path, redirect.source);
+        if (match) {
+            const compiledDestination = compileDestination(redirect.destination, match.params);
+            if (!compiledDestination) {
+                return null;
+            }
+            return {
+                redirectPath: compiledDestination,
+                statusCode: redirect.statusCode
+            };
+        }
+    }
+    return null;
+}
+/**
+ * Create a redirect response with the given status code for CloudFront.
+ * @param uri
+ * @param querystring
+ * @param statusCode
+ */
+function createRedirectResponse(uri, querystring, statusCode) {
+    let location;
+    // Properly join query strings
+    if (querystring) {
+        const [uriPath, uriQuery] = uri.split("?");
+        location = `${uriPath}?${querystring}${uriQuery ? `&${uriQuery}` : ""}`;
+    }
+    else {
+        location = uri;
+    }
+    const status = statusCode.toString();
+    const statusDescription = http.STATUS_CODES[status];
+    const refresh = statusCode === 308
+        ? [
+            // Required for IE11 compatibility
+            {
+                key: "Refresh",
+                value: `0;url=${location}`
+            }
+        ]
+        : [];
+    return {
+        status: status,
+        statusDescription: statusDescription,
+        headers: {
+            location: [
+                {
+                    key: "Location",
+                    value: location
+                }
+            ],
+            refresh: refresh
+        }
+    };
+}
+/**
+ * Get a domain redirect such as redirecting www to non-www domain.
+ * @param request
+ * @param buildManifest
+ */
+function getDomainRedirectPath(request, buildManifest) {
+    const hostHeaders = request.headers["host"];
+    if (hostHeaders && hostHeaders.length > 0) {
+        const host = hostHeaders[0].value;
+        const domainRedirects = buildManifest.domainRedirects;
+        if (domainRedirects && domainRedirects[host]) {
+            return `${domainRedirects[host]}${request.uri}`;
+        }
+    }
+    return null;
+}
+
+/**
+ * Get the rewrite of the given path, if it exists. Otherwise return null.
+ * @param path
+ * @param routesManifest
+ * @param router
+ * @param normalisedPath
+ */
+function getRewritePath(path, routesManifest, router, normalisedPath) {
+    const rewrites = routesManifest.rewrites;
+    for (const rewrite of rewrites) {
+        const match = matchPath(path, rewrite.source);
+        if (match) {
+            const destination = compileDestination(rewrite.destination, match.params);
+            // No-op rewrite support: skip to next rewrite if path does not map to existing non-dynamic and dynamic routes
+            if (path === destination) {
+                const url = router(normalisedPath);
+                if (url === "pages/404.html" || url === "pages/_error.js") {
+                    continue;
+                }
+            }
+            return destination;
+        }
+    }
+    return null;
+}
+
+function addHeadersToResponse(path, response, routesManifest) {
+    // Add custom headers to response
+    if (response.headers) {
+        for (const headerData of routesManifest.headers) {
+            const match = matchPath(path, headerData.source);
+            if (match) {
+                for (const header of headerData.headers) {
+                    if (header.key && header.value) {
+                        const headerLowerCase = header.key.toLowerCase();
+                        response.headers[headerLowerCase] = [
+                            {
+                                key: headerLowerCase,
+                                value: header.value
+                            }
+                        ];
+                    }
+                }
+            }
+        }
+    }
+}
+
 /*!
  * cookie
  * Copyright(c) 2012-2014 Roman Shtylman
@@ -336,7 +913,7 @@ var nextAwsCloudfront = handler;
  * @public
  */
 
-var parse_1 = parse;
+var parse_1 = parse$1;
 var serialize_1 = serialize;
 
 /**
@@ -370,7 +947,7 @@ var fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
  * @public
  */
 
-function parse(str, options) {
+function parse$1(str, options) {
   if (typeof str !== 'string') {
     throw new TypeError('argument str must be a string');
   }
@@ -1507,7 +2084,7 @@ var ms = function(val, options) {
   options = options || {};
   var type = typeof val;
   if (type === 'string' && val.length > 0) {
-    return parse$1(val);
+    return parse$2(val);
   } else if (type === 'number' && isFinite(val)) {
     return options.long ? fmtLong(val) : fmtShort(val);
   }
@@ -1525,7 +2102,7 @@ var ms = function(val, options) {
  * @api private
  */
 
-function parse$1(str) {
+function parse$2(str) {
   str = String(str);
   if (str.length > 100) {
     return;
@@ -5263,583 +5840,82 @@ var jsonwebtoken = {
   TokenExpiredError: TokenExpiredError_1,
 };
 
-/**
- * Tokenize input string.
- */
-function lexer(str) {
-    var tokens = [];
-    var i = 0;
-    while (i < str.length) {
-        var char = str[i];
-        if (char === "*" || char === "+" || char === "?") {
-            tokens.push({ type: "MODIFIER", index: i, value: str[i++] });
-            continue;
-        }
-        if (char === "\\") {
-            tokens.push({ type: "ESCAPED_CHAR", index: i++, value: str[i++] });
-            continue;
-        }
-        if (char === "{") {
-            tokens.push({ type: "OPEN", index: i, value: str[i++] });
-            continue;
-        }
-        if (char === "}") {
-            tokens.push({ type: "CLOSE", index: i, value: str[i++] });
-            continue;
-        }
-        if (char === ":") {
-            var name = "";
-            var j = i + 1;
-            while (j < str.length) {
-                var code = str.charCodeAt(j);
-                if (
-                // `0-9`
-                (code >= 48 && code <= 57) ||
-                    // `A-Z`
-                    (code >= 65 && code <= 90) ||
-                    // `a-z`
-                    (code >= 97 && code <= 122) ||
-                    // `_`
-                    code === 95) {
-                    name += str[j++];
-                    continue;
-                }
-                break;
-            }
-            if (!name)
-                throw new TypeError("Missing parameter name at " + i);
-            tokens.push({ type: "NAME", index: i, value: name });
-            i = j;
-            continue;
-        }
-        if (char === "(") {
-            var count = 1;
-            var pattern = "";
-            var j = i + 1;
-            if (str[j] === "?") {
-                throw new TypeError("Pattern cannot start with \"?\" at " + j);
-            }
-            while (j < str.length) {
-                if (str[j] === "\\") {
-                    pattern += str[j++] + str[j++];
-                    continue;
-                }
-                if (str[j] === ")") {
-                    count--;
-                    if (count === 0) {
-                        j++;
-                        break;
-                    }
-                }
-                else if (str[j] === "(") {
-                    count++;
-                    if (str[j + 1] !== "?") {
-                        throw new TypeError("Capturing groups are not allowed at " + j);
-                    }
-                }
-                pattern += str[j++];
-            }
-            if (count)
-                throw new TypeError("Unbalanced pattern at " + i);
-            if (!pattern)
-                throw new TypeError("Missing pattern at " + i);
-            tokens.push({ type: "PATTERN", index: i, value: pattern });
-            i = j;
-            continue;
-        }
-        tokens.push({ type: "CHAR", index: i, value: str[i++] });
-    }
-    tokens.push({ type: "END", index: i, value: "" });
-    return tokens;
-}
-/**
- * Parse a string for the raw tokens.
- */
-function parse$2(str, options) {
-    if (options === void 0) { options = {}; }
-    var tokens = lexer(str);
-    var _a = options.prefixes, prefixes = _a === void 0 ? "./" : _a;
-    var defaultPattern = "[^" + escapeString(options.delimiter || "/#?") + "]+?";
-    var result = [];
-    var key = 0;
-    var i = 0;
-    var path = "";
-    var tryConsume = function (type) {
-        if (i < tokens.length && tokens[i].type === type)
-            return tokens[i++].value;
-    };
-    var mustConsume = function (type) {
-        var value = tryConsume(type);
-        if (value !== undefined)
-            return value;
-        var _a = tokens[i], nextType = _a.type, index = _a.index;
-        throw new TypeError("Unexpected " + nextType + " at " + index + ", expected " + type);
-    };
-    var consumeText = function () {
-        var result = "";
-        var value;
-        // tslint:disable-next-line
-        while ((value = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR"))) {
-            result += value;
-        }
-        return result;
-    };
-    while (i < tokens.length) {
-        var char = tryConsume("CHAR");
-        var name = tryConsume("NAME");
-        var pattern = tryConsume("PATTERN");
-        if (name || pattern) {
-            var prefix = char || "";
-            if (prefixes.indexOf(prefix) === -1) {
-                path += prefix;
-                prefix = "";
-            }
-            if (path) {
-                result.push(path);
-                path = "";
-            }
-            result.push({
-                name: name || key++,
-                prefix: prefix,
-                suffix: "",
-                pattern: pattern || defaultPattern,
-                modifier: tryConsume("MODIFIER") || ""
-            });
-            continue;
-        }
-        var value = char || tryConsume("ESCAPED_CHAR");
-        if (value) {
-            path += value;
-            continue;
-        }
-        if (path) {
-            result.push(path);
-            path = "";
-        }
-        var open = tryConsume("OPEN");
-        if (open) {
-            var prefix = consumeText();
-            var name_1 = tryConsume("NAME") || "";
-            var pattern_1 = tryConsume("PATTERN") || "";
-            var suffix = consumeText();
-            mustConsume("CLOSE");
-            result.push({
-                name: name_1 || (pattern_1 ? key++ : ""),
-                pattern: name_1 && !pattern_1 ? defaultPattern : pattern_1,
-                prefix: prefix,
-                suffix: suffix,
-                modifier: tryConsume("MODIFIER") || ""
-            });
-            continue;
-        }
-        mustConsume("END");
-    }
-    return result;
-}
-/**
- * Compile a string to a template function for the path.
- */
-function compile(str, options) {
-    return tokensToFunction(parse$2(str, options), options);
-}
-/**
- * Expose a method for transforming tokens into the path function.
- */
-function tokensToFunction(tokens, options) {
-    if (options === void 0) { options = {}; }
-    var reFlags = flags(options);
-    var _a = options.encode, encode = _a === void 0 ? function (x) { return x; } : _a, _b = options.validate, validate = _b === void 0 ? true : _b;
-    // Compile all the tokens into regexps.
-    var matches = tokens.map(function (token) {
-        if (typeof token === "object") {
-            return new RegExp("^(?:" + token.pattern + ")$", reFlags);
-        }
-    });
-    return function (data) {
-        var path = "";
-        for (var i = 0; i < tokens.length; i++) {
-            var token = tokens[i];
-            if (typeof token === "string") {
-                path += token;
-                continue;
-            }
-            var value = data ? data[token.name] : undefined;
-            var optional = token.modifier === "?" || token.modifier === "*";
-            var repeat = token.modifier === "*" || token.modifier === "+";
-            if (Array.isArray(value)) {
-                if (!repeat) {
-                    throw new TypeError("Expected \"" + token.name + "\" to not repeat, but got an array");
-                }
-                if (value.length === 0) {
-                    if (optional)
-                        continue;
-                    throw new TypeError("Expected \"" + token.name + "\" to not be empty");
-                }
-                for (var j = 0; j < value.length; j++) {
-                    var segment = encode(value[j], token);
-                    if (validate && !matches[i].test(segment)) {
-                        throw new TypeError("Expected all \"" + token.name + "\" to match \"" + token.pattern + "\", but got \"" + segment + "\"");
-                    }
-                    path += token.prefix + segment + token.suffix;
-                }
-                continue;
-            }
-            if (typeof value === "string" || typeof value === "number") {
-                var segment = encode(String(value), token);
-                if (validate && !matches[i].test(segment)) {
-                    throw new TypeError("Expected \"" + token.name + "\" to match \"" + token.pattern + "\", but got \"" + segment + "\"");
-                }
-                path += token.prefix + segment + token.suffix;
-                continue;
-            }
-            if (optional)
-                continue;
-            var typeOfMessage = repeat ? "an array" : "a string";
-            throw new TypeError("Expected \"" + token.name + "\" to be " + typeOfMessage);
-        }
-        return path;
-    };
-}
-/**
- * Create path match function from `path-to-regexp` spec.
- */
-function match(str, options) {
-    var keys = [];
-    var re = pathToRegexp(str, keys, options);
-    return regexpToFunction(re, keys, options);
-}
-/**
- * Create a path match function from `path-to-regexp` output.
- */
-function regexpToFunction(re, keys, options) {
-    if (options === void 0) { options = {}; }
-    var _a = options.decode, decode = _a === void 0 ? function (x) { return x; } : _a;
-    return function (pathname) {
-        var m = re.exec(pathname);
-        if (!m)
-            return false;
-        var path = m[0], index = m.index;
-        var params = Object.create(null);
-        var _loop_1 = function (i) {
-            // tslint:disable-next-line
-            if (m[i] === undefined)
-                return "continue";
-            var key = keys[i - 1];
-            if (key.modifier === "*" || key.modifier === "+") {
-                params[key.name] = m[i].split(key.prefix + key.suffix).map(function (value) {
-                    return decode(value, key);
-                });
-            }
-            else {
-                params[key.name] = decode(m[i], key);
-            }
-        };
-        for (var i = 1; i < m.length; i++) {
-            _loop_1(i);
-        }
-        return { path: path, index: index, params: params };
-    };
-}
-/**
- * Escape a regular expression string.
- */
-function escapeString(str) {
-    return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
-}
-/**
- * Get the flags for a regexp from the options.
- */
-function flags(options) {
-    return options && options.sensitive ? "" : "i";
-}
-/**
- * Pull out keys from a regexp.
- */
-function regexpToRegexp(path, keys) {
-    if (!keys)
-        return path;
-    // Use a negative lookahead to match only capturing groups.
-    var groups = path.source.match(/\((?!\?)/g);
-    if (groups) {
-        for (var i = 0; i < groups.length; i++) {
-            keys.push({
-                name: i,
-                prefix: "",
-                suffix: "",
-                modifier: "",
-                pattern: ""
-            });
-        }
-    }
-    return path;
-}
-/**
- * Transform an array into a regexp.
- */
-function arrayToRegexp(paths, keys, options) {
-    var parts = paths.map(function (path) { return pathToRegexp(path, keys, options).source; });
-    return new RegExp("(?:" + parts.join("|") + ")", flags(options));
-}
-/**
- * Create a path regexp from string input.
- */
-function stringToRegexp(path, keys, options) {
-    return tokensToRegexp(parse$2(path, options), keys, options);
-}
-/**
- * Expose a function for taking tokens and returning a RegExp.
- */
-function tokensToRegexp(tokens, keys, options) {
-    if (options === void 0) { options = {}; }
-    var _a = options.strict, strict = _a === void 0 ? false : _a, _b = options.start, start = _b === void 0 ? true : _b, _c = options.end, end = _c === void 0 ? true : _c, _d = options.encode, encode = _d === void 0 ? function (x) { return x; } : _d;
-    var endsWith = "[" + escapeString(options.endsWith || "") + "]|$";
-    var delimiter = "[" + escapeString(options.delimiter || "/#?") + "]";
-    var route = start ? "^" : "";
-    // Iterate over the tokens and create our regexp string.
-    for (var _i = 0, tokens_1 = tokens; _i < tokens_1.length; _i++) {
-        var token = tokens_1[_i];
-        if (typeof token === "string") {
-            route += escapeString(encode(token));
-        }
-        else {
-            var prefix = escapeString(encode(token.prefix));
-            var suffix = escapeString(encode(token.suffix));
-            if (token.pattern) {
-                if (keys)
-                    keys.push(token);
-                if (prefix || suffix) {
-                    if (token.modifier === "+" || token.modifier === "*") {
-                        var mod = token.modifier === "*" ? "?" : "";
-                        route += "(?:" + prefix + "((?:" + token.pattern + ")(?:" + suffix + prefix + "(?:" + token.pattern + "))*)" + suffix + ")" + mod;
-                    }
-                    else {
-                        route += "(?:" + prefix + "(" + token.pattern + ")" + suffix + ")" + token.modifier;
-                    }
-                }
-                else {
-                    route += "(" + token.pattern + ")" + token.modifier;
-                }
-            }
-            else {
-                route += "(?:" + prefix + suffix + ")" + token.modifier;
-            }
-        }
-    }
-    if (end) {
-        if (!strict)
-            route += delimiter + "?";
-        route += !options.endsWith ? "$" : "(?=" + endsWith + ")";
-    }
-    else {
-        var endToken = tokens[tokens.length - 1];
-        var isEndDelimited = typeof endToken === "string"
-            ? delimiter.indexOf(endToken[endToken.length - 1]) > -1
-            : // tslint:disable-next-line
-                endToken === undefined;
-        if (!strict) {
-            route += "(?:" + delimiter + "(?=" + endsWith + "))?";
-        }
-        if (!isEndDelimited) {
-            route += "(?=" + delimiter + "|" + endsWith + ")";
-        }
-    }
-    return new RegExp(route, flags(options));
-}
-/**
- * Normalize the given path string, returning a regular expression.
- *
- * An empty array can be passed in for the keys, which will hold the
- * placeholder key descriptions. For example, using `/user/:id`, `keys` will
- * contain `[{ name: 'id', delimiter: '/', optional: false, repeat: false }]`.
- */
-function pathToRegexp(path, keys, options) {
-    if (path instanceof RegExp)
-        return regexpToRegexp(path, keys);
-    if (Array.isArray(path))
-        return arrayToRegexp(path, keys, options);
-    return stringToRegexp(path, keys, options);
-}
-
-/**
- Provides matching capabilities to support custom redirects, rewrites, and headers.
- */
-/**
- * Match the given path against a source path.
- * @param path
- * @param source
- */
-function matchPath(path, source) {
-    const matcher = match(source, { decode: decodeURIComponent });
-    return matcher(path);
-}
-/**
- * Compile a destination for redirects or rewrites.
- * @param destination
- * @param params
- */
-function compileDestination(destination, params) {
-    try {
-        const destinationLowerCase = destination.toLowerCase();
-        if (destinationLowerCase.startsWith("https://") ||
-            destinationLowerCase.startsWith("http://")) {
-            // Handle external URLs
-            const { origin, pathname } = new URL(destination);
-            const toPath = compile(pathname, { encode: encodeURIComponent });
-            const compiledDestination = `${origin}${toPath(params)}`;
-            // Remove trailing slash if original destination didn't have it
-            if (!destination.endsWith("/") && compiledDestination.endsWith("/")) {
-                return compiledDestination.slice(0, -1);
-            }
-            else {
-                return compiledDestination;
-            }
-        }
-        else {
-            // Handle all other paths. Escape all ? in case of query parameters
-            const escapedDestination = destination.replace(/\?/g, "\\?");
-            const toPath = compile(escapedDestination, {
-                encode: encodeURIComponent
-            });
-            return toPath(params);
-        }
-    }
-    catch (error) {
-        console.error(`Could not compile destination ${destination}, returning null instead. Error: ${error}`);
-        return null;
-    }
-}
-
-/**
- * Get the redirect of the given path, if it exists. Otherwise return null.
- * @param path
- * @param routesManifest
- */
-function getRedirectPath(path, routesManifest) {
-    const redirects = routesManifest.redirects;
-    for (const redirect of redirects) {
-        const match = matchPath(path, redirect.source);
-        if (match) {
-            const compiledDestination = compileDestination(redirect.destination, match.params);
-            if (!compiledDestination) {
-                return null;
-            }
-            return {
-                redirectPath: compiledDestination,
-                statusCode: redirect.statusCode
-            };
-        }
-    }
-    return null;
-}
-/**
- * Create a redirect response with the given status code for CloudFront.
- * @param uri
- * @param querystring
- * @param statusCode
- */
-function createRedirectResponse(uri, querystring, statusCode) {
-    const location = querystring ? `${uri}?${querystring}` : uri;
-    const status = statusCode.toString();
-    const statusDescription = http.STATUS_CODES[status];
-    const refresh = statusCode === 308
-        ? [
-            // Required for IE11 compatibility
-            {
-                key: "Refresh",
-                value: `0;url=${location}`
-            }
-        ]
-        : [];
-    return {
-        status: status,
-        statusDescription: statusDescription,
-        headers: {
-            location: [
-                {
-                    key: "Location",
-                    value: location
-                }
-            ],
-            refresh: refresh
-        }
-    };
-}
-/**
- * Get a domain redirect such as redirecting www to non-www domain.
- * @param request
- * @param buildManifest
- */
-function getDomainRedirectPath(request, buildManifest) {
-    const hostHeaders = request.headers["host"];
-    if (hostHeaders && hostHeaders.length > 0) {
-        const host = hostHeaders[0].value;
-        const domainRedirects = buildManifest.domainRedirects;
-        if (domainRedirects && domainRedirects[host]) {
-            return `${domainRedirects[host]}${request.uri}`;
-        }
-    }
-    return null;
-}
-
-/**
- * Get the rewrite of the given path, if it exists. Otherwise return null.
- * @param path
- * @param routesManifest
- */
-function getRewritePath(path, routesManifest) {
-    const rewrites = routesManifest.rewrites;
-    for (const rewrite of rewrites) {
-        const match = matchPath(path, rewrite.source);
-        if (match) {
-            return compileDestination(rewrite.destination, match.params);
-        }
-    }
-    return null;
-}
-
-function addHeadersToResponse(path, response, routesManifest) {
-    // Add custom headers to response
-    if (response.headers) {
-        for (const headerData of routesManifest.headers) {
-            const match = matchPath(path, headerData.source);
-            if (match) {
-                for (const header of headerData.headers) {
-                    if (header.key && header.value) {
-                        const headerLowerCase = header.key.toLowerCase();
-                        response.headers[headerLowerCase] = [
-                            {
-                                key: headerLowerCase,
-                                value: header.value
-                            }
-                        ];
-                    }
-                }
-            }
-        }
-    }
-}
-
-// @ts-ignore
-const basePath = RoutesManifestJson__default['default'].basePath;
 const NEXT_PREVIEW_DATA_COOKIE = "__next_preview_data";
 const NEXT_PRERENDER_BYPASS_COOKIE = "__prerender_bypass";
 const defaultPreviewCookies = {
     [NEXT_PRERENDER_BYPASS_COOKIE]: "",
     [NEXT_PREVIEW_DATA_COOKIE]: ""
 };
-const getPreviewCookies = (request) => {
-    const targetCookie = request.headers.cookie || [];
+/**
+ * Determine if the request contains a valid signed JWT for preview mode
+ *
+ * @param cookies - Cookies header with cookies in RFC 6265 compliant format
+ * @param previewModeSigningKey - Next build key generated in the preRenderManifest
+ */
+const isValidPreviewRequest = (cookies, previewModeSigningKey) => {
+    const previewCookies = getPreviewCookies(cookies);
+    if (hasPreviewCookies(previewCookies)) {
+        try {
+            jsonwebtoken.verify(previewCookies[NEXT_PREVIEW_DATA_COOKIE], previewModeSigningKey);
+            return true;
+        }
+        catch (e) {
+            console.warn("Found preview headers without valid authentication token");
+        }
+    }
+    return false;
+};
+// Private
+const getPreviewCookies = (cookies) => {
+    const targetCookie = cookies || [];
     return targetCookie.reduce((previewCookies, cookieObj) => {
-        const cookieValue = cookie.parse(cookieObj.value);
-        if (cookieValue[NEXT_PREVIEW_DATA_COOKIE] &&
-            cookieValue[NEXT_PRERENDER_BYPASS_COOKIE]) {
-            return cookieValue;
+        const parsedCookie = cookie.parse(cookieObj.value);
+        if (hasPreviewCookies(parsedCookie)) {
+            return parsedCookie;
         }
-        else {
-            return previewCookies;
-        }
+        return previewCookies;
     }, defaultPreviewCookies);
 };
+const hasPreviewCookies = (cookies) => !!(cookies[NEXT_PREVIEW_DATA_COOKIE] && cookies[NEXT_PRERENDER_BYPASS_COOKIE]);
+
+function getUnauthenticatedResponse(authorizationHeader, authentication) {
+    if (authentication && authentication.username && authentication.password) {
+        const validAuth = "Basic " +
+            Buffer.from(authentication.username + ":" + authentication.password).toString("base64");
+        if (authorizationHeader !== validAuth) {
+            return {
+                status: "401",
+                statusDescription: "Unauthorized",
+                body: "Unauthorized",
+                headers: {
+                    "www-authenticate": [{ key: "WWW-Authenticate", value: "Basic" }]
+                }
+            };
+        }
+    }
+    return null;
+}
+
+const buildS3RetryStrategy = async () => {
+    const { defaultRetryDecider, StandardRetryStrategy } = await Promise.resolve().then(function () { return index; });
+    const retryDecider = (err) => {
+        if ("code" in err &&
+            (err.code === "ECONNRESET" ||
+                err.code === "EPIPE" ||
+                err.code === "ETIMEDOUT")) {
+            return true;
+        }
+        else {
+            return defaultRetryDecider(err);
+        }
+    };
+    return new StandardRetryStrategy(async () => 3, {
+        retryDecider
+    });
+};
+
+// @ts-ignore
+const basePath = RoutesManifestJson__default['default'].basePath;
 const perfLogger = (logLambdaExecutionTimes) => {
     if (logLambdaExecutionTimes) {
         return {
@@ -5906,6 +5982,9 @@ const router = (manifest) => {
         if (ssr.nonDynamic[normalisedUri]) {
             return ssr.nonDynamic[normalisedUri];
         }
+        if (html.nonDynamic[normalisedUri]) {
+            return html.nonDynamic[normalisedUri];
+        }
         for (const route in allDynamicRoutes) {
             const { file, regex } = allDynamicRoutes[route];
             const re = new RegExp(regex, "i");
@@ -5920,24 +5999,6 @@ const router = (manifest) => {
         }
         return "pages/_error.js";
     };
-};
-// Need retries to fix https://github.com/aws/aws-sdk-js-v3/issues/1196
-const buildS3RetryStrategy = async () => {
-    const { defaultRetryDecider, StandardRetryStrategy } = await Promise.resolve().then(function () { return index; });
-    const retryDecider = (err) => {
-        if ("code" in err &&
-            (err.code === "ECONNRESET" ||
-                err.code === "EPIPE" ||
-                err.code === "ETIMEDOUT")) {
-            return true;
-        }
-        else {
-            return defaultRetryDecider(err);
-        }
-    };
-    return new StandardRetryStrategy(async () => 3, {
-        retryDecider
-    });
 };
 const handler$1 = async (event) => {
     const manifest = Manifest__default['default'];
@@ -5973,6 +6034,12 @@ const handler$1 = async (event) => {
 };
 const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesManifest }) => {
     const request = event.Records[0].cf.request;
+    // Handle basic auth
+    const authorization = request.headers.authorization;
+    const unauthResponse = getUnauthenticatedResponse(authorization ? authorization[0].value : null, manifest.authentication);
+    if (unauthResponse) {
+        return unauthResponse;
+    }
     // Handle domain redirects e.g www to non-www domain
     const domainRedirect = getDomainRedirectPath(request, manifest);
     if (domainRedirect) {
@@ -5980,8 +6047,9 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
     }
     const basePath = routesManifest.basePath;
     let uri = normaliseUri(request.uri);
+    const decodedUri = decodeURI(uri);
     const { pages, publicFiles } = manifest;
-    let isPublicFile = publicFiles[uri];
+    let isPublicFile = publicFiles[decodedUri];
     let isDataReq = isDataRequest(uri);
     // Handle redirects
     // TODO: refactor redirect logic to another file since this is getting quite large
@@ -6015,12 +6083,21 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
         return createRedirectResponse(customRedirect.redirectPath, request.querystring, customRedirect.statusCode);
     }
     // Check for non-dynamic pages before rewriting
-    let isNonDynamicRoute = pages.html.nonDynamic[uri] || pages.ssr.nonDynamic[uri] || isPublicFile;
+    const isNonDynamicRoute = pages.html.nonDynamic[uri] || pages.ssr.nonDynamic[uri] || isPublicFile;
+    let rewrittenUri;
     // Handle custom rewrites, but don't rewrite non-dynamic pages, public files or data requests per Next.js docs: https://nextjs.org/docs/api-reference/next.config.js/rewrites
     if (!isNonDynamicRoute && !isDataReq) {
-        const customRewrite = getRewritePath(request.uri, routesManifest);
+        const customRewrite = getRewritePath(request.uri, routesManifest, router(manifest), uri);
         if (customRewrite) {
-            request.uri = customRewrite;
+            rewrittenUri = request.uri;
+            const [customRewriteUriPath, customRewriteUriQuery] = customRewrite.split("?");
+            request.uri = customRewriteUriPath;
+            if (request.querystring) {
+                request.querystring = `${request.querystring}${customRewriteUriQuery ? `&${customRewriteUriQuery}` : ""}`;
+            }
+            else {
+                request.querystring = `${customRewriteUriQuery !== null && customRewriteUriQuery !== void 0 ? customRewriteUriQuery : ""}`;
+            }
             uri = normaliseUri(request.uri);
         }
     }
@@ -6032,21 +6109,7 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
     const normalisedS3DomainName = normaliseS3OriginDomain(s3Origin);
     const hasFallback = hasFallbackForUri(uri, prerenderManifest, manifest);
     const { now, log } = perfLogger(manifest.logLambdaExecutionTimes);
-    const previewCookies = getPreviewCookies(request);
-    const isPreviewRequest = previewCookies[NEXT_PREVIEW_DATA_COOKIE] &&
-        previewCookies[NEXT_PRERENDER_BYPASS_COOKIE];
-    if (isPreviewRequest) {
-        try {
-            jsonwebtoken.verify(previewCookies[NEXT_PREVIEW_DATA_COOKIE], prerenderManifest.preview.previewModeSigningKey);
-        }
-        catch (e) {
-            console.error("Failed preview mode verification for URI:", request.uri);
-            return {
-                status: "403",
-                statusDescription: "Forbidden"
-            };
-        }
-    }
+    const isPreviewRequest = isValidPreviewRequest(request.headers.cookie, prerenderManifest.preview.previewModeSigningKey);
     s3Origin.domainName = normalisedS3DomainName;
     S3Check: if (
     // Note: public files and static pages (HTML pages with no props) don't have JS files needed for preview mode, always serve from S3.
@@ -6062,7 +6125,7 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
             }
         }
         else if (isHTMLPage || hasFallback) {
-            s3Origin.path = `${basePath}/static-pages`;
+            s3Origin.path = `${basePath}/static-pages/${manifest.buildId}`;
             const pageName = uri === "/" ? "/index" : uri;
             request.uri = `${pageName}.html`;
         }
@@ -6072,24 +6135,26 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
             const pagePath = router(manifest)(normalisedDataRequestUri);
             if (pagePath === "pages/404.html") {
                 // Request static 404 page from s3
-                s3Origin.path = `${basePath}/static-pages`;
+                s3Origin.path = `${basePath}/static-pages/${manifest.buildId}`;
                 request.uri = pagePath.replace("pages", "");
             }
             else if (pagePath === "pages/_error.js" ||
-                !prerenderManifest.routes[normalisedDataRequestUri]) {
+                (!prerenderManifest.routes[normalisedDataRequestUri] &&
+                    !hasFallbackForUri(normalisedDataRequestUri, prerenderManifest, manifest))) {
                 // Break to continue to SSR render in two cases:
                 // 1. URI routes to _error.js
-                // 2. URI is not unmatched, but it's not in prerendered routes, i.e this is an SSR data request, we need to SSR render the JSON
+                // 2. URI is not unmatched, but it's not in prerendered routes nor is for an SSG fallback, i.e this is an SSR data request, we need to SSR render the JSON
                 break S3Check;
             }
-            // Otherwise, this is an SSG data request, so continue to get the JSON from S3
+            // Otherwise, this is an SSG data request, so continue to get to try to get the JSON from S3.
+            // For fallback SSG, this will fail the first time but the origin response handler will render and store in S3.
         }
         addS3HostHeader(request, normalisedS3DomainName);
         return request;
     }
     const pagePath = router(manifest)(uri);
     if (pagePath.endsWith(".html") && !isPreviewRequest) {
-        s3Origin.path = `${basePath}/static-pages`;
+        s3Origin.path = `${basePath}/static-pages/${manifest.buildId}`;
         request.uri = pagePath.replace("pages", "");
         addS3HostHeader(request, normalisedS3DomainName);
         return request;
@@ -6100,7 +6165,8 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
     log("require JS execution time", tBeforePageRequire, tAfterPageRequire);
     const tBeforeSSR = now();
     const { req, res, responsePromise } = nextAwsCloudfront(event.Records[0].cf, {
-        enableHTTPCompression: manifest.enableHTTPCompression
+        enableHTTPCompression: manifest.enableHTTPCompression,
+        rewrittenUri
     });
     try {
         // If page is _error.js, set status to 404 so _error.js will render a 404 page
@@ -6114,7 +6180,7 @@ const handleOriginRequest = async ({ event, manifest, prerenderManifest, routesM
             res.end(JSON.stringify(renderOpts.pageData));
         }
         else {
-            await page.render(req, res);
+            await Promise.race([page.render(req, res), responsePromise]);
         }
     }
     catch (error) {
@@ -6172,11 +6238,12 @@ const handleOriginResponse = async ({ event, manifest, prerenderManifest }) => {
                 Bucket: bucketName,
                 Key: `${basePath}${basePath === "" ? "" : "/"}${uri.replace(/^\//, "")}`,
                 Body: JSON.stringify(renderOpts.pageData),
-                ContentType: "application/json"
+                ContentType: "application/json",
+                CacheControl: "public, max-age=0, s-maxage=2678400, must-revalidate"
             };
             const s3HtmlParams = {
                 Bucket: bucketName,
-                Key: `${basePath}${basePath === "" ? "" : "/"}static-pages/${request.uri
+                Key: `${basePath}${basePath === "" ? "" : "/"}static-pages/${manifest.buildId}/${request.uri
                     .replace(`/_next/data/${manifest.buildId}/`, "")
                     .replace(".json", ".html")}`,
                 Body: html,
@@ -6199,7 +6266,7 @@ const handleOriginResponse = async ({ event, manifest, prerenderManifest }) => {
         if (!hasFallback)
             return response;
         // If route has fallback, return that page from S3, otherwise return 404 page
-        let s3Key = `${basePath}${basePath === "" ? "" : "/"}static-pages${hasFallback.fallback || "/404.html"}`;
+        const s3Key = `${basePath}${basePath === "" ? "" : "/"}static-pages/${manifest.buildId}${hasFallback.fallback || "/404.html"}`;
         const { GetObjectCommand } = await Promise.resolve().then(function () { return GetObjectCommand$1; });
         // S3 Body is stream per: https://github.com/aws/aws-sdk-js-v3/issues/1096
         const getStream = await Promise.resolve().then(function () { return index$1; });
@@ -6208,7 +6275,7 @@ const handleOriginResponse = async ({ event, manifest, prerenderManifest }) => {
             Bucket: bucketName,
             Key: s3Key
         };
-        const { Body } = await s3.send(new GetObjectCommand(s3Params));
+        const { Body, CacheControl } = await s3.send(new GetObjectCommand(s3Params));
         bodyString = await getStream.default(Body);
         return {
             status: hasFallback.fallback ? "200" : "404",
@@ -6224,7 +6291,9 @@ const handleOriginResponse = async ({ event, manifest, prerenderManifest }) => {
                 "cache-control": [
                     {
                         key: "Cache-Control",
-                        value: "public, max-age=0, s-maxage=2678400, must-revalidate"
+                        value: CacheControl !== null && CacheControl !== void 0 ? CacheControl : (hasFallback.fallback // Use cache-control from S3 response if possible, otherwise use defaults
+                            ? "public, max-age=0, s-maxage=0, must-revalidate" // fallback should never be cached
+                            : "public, max-age=0, s-maxage=2678400, must-revalidate")
                     }
                 ]
             },

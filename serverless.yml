@@ -1,27 +1,22 @@
 # serverless.yml
 
-service: ${self:custom.name}
-
-provider:
-  name: aws
-  runtime: nodejs12.x
-  stage: ${opt:stage, 'dev'}
-  region: us-east-1
-  profile: ${self:custom.profiles.${opt:stage, self:provider.stage, 'dev'}}
-
-plugins: 
- - serverless-nextjs-plugin
-  
-custom:
-  name: resume-site
-  serverless-nextjs:
-    assetsBucketName: 'resume-site-assets-${self:provider.stage}'
-  profiles:
-    dev: devProfile
-    prod: prodProfile
-
-package:
-  # exclude everything
-  # page handlers are automatically included by the plugin
-  exclude:
-    - ./**
+resume-site:
+  component: '@sls-next/serverless-component@1.19.0-alpha.19'
+  service: ${resume-site:custom.name}
+  provider:
+    name: aws
+    runtime: nodejs12.x
+    stage: ${opt:stage, 'dev'}
+    region: us-east-1
+    profile: ${resume-site:custom.profiles.${opt:stage, resume-site:provider.stage, 'dev'}}  
+  custom:
+    name: resume-site
+    assetsBucketName: 'resume-site-assets-${resume-site:provider.stage}'
+    profiles:
+      dev: devProfile
+      prod: prodProfile
+  package:
+    # exclude everything
+    # page handlers are automatically included by the plugin
+    exclude:
+      - ./**

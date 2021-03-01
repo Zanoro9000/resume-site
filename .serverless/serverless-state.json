@@ -187,7 +187,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/resume-site/dev/1614221567191-2021-02-25T02:52:47.191Z/resume-site.zip"
+                "S3Key": "serverless/resume-site/dev/1614630528478-2021-03-01T20:28:48.478Z/resume-site.zip"
               },
               "Handler": "sls-next-build/404.html.render",
               "Runtime": "nodejs12.x",
@@ -212,7 +212,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/resume-site/dev/1614221567191-2021-02-25T02:52:47.191Z/resume-site.zip"
+                "S3Key": "serverless/resume-site/dev/1614630528478-2021-03-01T20:28:48.478Z/resume-site.zip"
               },
               "Handler": "sls-next-build/_error.render",
               "Runtime": "nodejs12.x",
@@ -237,7 +237,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/resume-site/dev/1614221567191-2021-02-25T02:52:47.191Z/resume-site.zip"
+                "S3Key": "serverless/resume-site/dev/1614630528478-2021-03-01T20:28:48.478Z/resume-site.zip"
               },
               "Handler": "sls-next-build/index.html.render",
               "Runtime": "nodejs12.x",
@@ -255,34 +255,34 @@
               "IndexLogGroup"
             ]
           },
-          "NotDashfoundLambdaVersionPv2K5TmIxA6va1VcmIRUz4mvUQvyOem8quVLA2oOmw": {
+          "NotDashfoundLambdaVersionldoFnEtWLAXFeUtVeiWYig64eZJnDq6GzNERcfJaC4": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "NotDashfoundLambdaFunction"
               },
-              "CodeSha256": "e5p/DGYxaQZfZiwcLPWYPBpfXmJkKSAfqCdu/qqKOkc="
+              "CodeSha256": "qQcSQM/VlWT/5L51ErPwDKRf7ibjbKFYBPoSDF8KCqc="
             }
           },
-          "IndexLambdaVersionF1aZSu0g3RiHrZ9Vvj4t8vnymPEYPmp8wwdenj3gY": {
+          "IndexLambdaVersionZwkCK4Hd92uG7j7ZYPG40CamIMeBMo9JcHSeKqDVfM": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "IndexLambdaFunction"
               },
-              "CodeSha256": "e5p/DGYxaQZfZiwcLPWYPBpfXmJkKSAfqCdu/qqKOkc="
+              "CodeSha256": "qQcSQM/VlWT/5L51ErPwDKRf7ibjbKFYBPoSDF8KCqc="
             }
           },
-          "404LambdaVersionbM34zOPUEIXuBO8LyTf0CJhTljSbOpAmBOw5PmbDKCc": {
+          "404LambdaVersionnY70dNgTqhyavRn1fXsIuDk4JjGf1OCU2QrX1VVoJzY": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "404LambdaFunction"
               },
-              "CodeSha256": "e5p/DGYxaQZfZiwcLPWYPBpfXmJkKSAfqCdu/qqKOkc="
+              "CodeSha256": "qQcSQM/VlWT/5L51ErPwDKRf7ibjbKFYBPoSDF8KCqc="
             }
           },
           "ApiGatewayRestApi": {
@@ -591,7 +591,7 @@
               "MethodResponses": []
             }
           },
-          "ApiGatewayDeployment1614221558252": {
+          "ApiGatewayDeployment1614630515937": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -908,19 +908,19 @@
           "NotDashfoundLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "NotDashfoundLambdaVersionPv2K5TmIxA6va1VcmIRUz4mvUQvyOem8quVLA2oOmw"
+              "Ref": "NotDashfoundLambdaVersionldoFnEtWLAXFeUtVeiWYig64eZJnDq6GzNERcfJaC4"
             }
           },
           "IndexLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "IndexLambdaVersionF1aZSu0g3RiHrZ9Vvj4t8vnymPEYPmp8wwdenj3gY"
+              "Ref": "IndexLambdaVersionZwkCK4Hd92uG7j7ZYPG40CamIMeBMo9JcHSeKqDVfM"
             }
           },
           "404LambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "404LambdaVersionbM34zOPUEIXuBO8LyTf0CJhTljSbOpAmBOw5PmbDKCc"
+              "Ref": "404LambdaVersionnY70dNgTqhyavRn1fXsIuDk4JjGf1OCU2QrX1VVoJzY"
             }
           },
           "ServiceEndpoint": {
@@ -1155,7 +1155,7 @@
         "timeout": 6,
         "runtime": "nodejs12.x",
         "vpc": {},
-        "versionLogicalId": "404LambdaVersionbM34zOPUEIXuBO8LyTf0CJhTljSbOpAmBOw5PmbDKCc"
+        "versionLogicalId": "404LambdaVersionnY70dNgTqhyavRn1fXsIuDk4JjGf1OCU2QrX1VVoJzY"
       },
       "not-found": {
         "handler": "sls-next-build/_error.render",
@@ -1181,7 +1181,7 @@
         "timeout": 6,
         "runtime": "nodejs12.x",
         "vpc": {},
-        "versionLogicalId": "NotDashfoundLambdaVersionPv2K5TmIxA6va1VcmIRUz4mvUQvyOem8quVLA2oOmw"
+        "versionLogicalId": "NotDashfoundLambdaVersionldoFnEtWLAXFeUtVeiWYig64eZJnDq6GzNERcfJaC4"
       },
       "index": {
         "handler": "sls-next-build/index.html.render",
@@ -1207,7 +1207,7 @@
         "timeout": 6,
         "runtime": "nodejs12.x",
         "vpc": {},
-        "versionLogicalId": "IndexLambdaVersionF1aZSu0g3RiHrZ9Vvj4t8vnymPEYPmp8wwdenj3gY"
+        "versionLogicalId": "IndexLambdaVersionZwkCK4Hd92uG7j7ZYPG40CamIMeBMo9JcHSeKqDVfM"
       }
     },
     "resources": {
@@ -1425,6 +1425,9 @@
     "serviceFilename": "serverless.yml",
     "layers": {},
     "initialServerlessConfig": {
+      "resume-site": {
+        "component": "serverless-next.js"
+      },
       "service": {
         "$ref": "$[\"service\"][\"serviceObject\"]"
       },
@@ -1447,14 +1450,14 @@
           "!node_modules\\next-aws-lambda/**/*.test.js"
         ],
         "artifact": "C:\\Users\\Tyler\\source\\repos\\resume-site\\.serverless\\resume-site.zip",
-        "artifactDirectoryName": "serverless/resume-site/dev/1614221567191-2021-02-25T02:52:47.191Z"
+        "artifactDirectoryName": "serverless/resume-site/dev/1614630528478-2021-03-01T20:28:48.478Z"
       }
     },
     "isDashboardMonitoringPreconfigured": false,
     "artifact": "C:\\Users\\Tyler\\source\\repos\\resume-site\\.serverless\\resume-site.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/resume-site/dev/1614221567191-2021-02-25T02:52:47.191Z",
+    "artifactDirectoryName": "serverless/resume-site/dev/1614630528478-2021-03-01T20:28:48.478Z",
     "artifact": "resume-site.zip"
   }
 }
