@@ -1,5 +1,5 @@
 import WorkInProgress from './WorkInProgress';
 
-export default function AboutMe() {
+export default function WorkExperience() {
 	return <WorkInProgress />;
 }

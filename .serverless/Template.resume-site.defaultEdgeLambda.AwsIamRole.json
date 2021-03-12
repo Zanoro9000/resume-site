@@ -19,7 +19,7 @@
       },
       {
         "Effect": "Allow",
-        "Resource": "arn:aws:s3:::fqlegcd-sv2y9wb/*",
+        "Resource": "arn:aws:s3:::fqlegcd-gok5ctn/*",
         "Action": [
           "s3:GetObject",
           "s3:PutObject"

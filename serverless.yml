@@ -2,6 +2,8 @@
 
 resume-site:
   component: '@sls-next/serverless-component@1.19.0-alpha.19'
+  inputs:
+    domain: tylerkennedy.dev
   service: ${resume-site:custom.name}
   provider:
     name: aws
@@ -9,12 +11,15 @@ resume-site:
     stage: ${opt:stage, 'dev'}
     region: us-east-1
     profile: ${resume-site:custom.profiles.${opt:stage, resume-site:provider.stage, 'dev'}}  
+  plugins:
+    - serverless-domain-manager
   custom:
     name: resume-site
     assetsBucketName: 'resume-site-assets-${resume-site:provider.stage}'
     profiles:
       dev: devProfile
       prod: prodProfile
+    customDomain: ${file(./serverless.${resume-site:provider.stage}.yml):custom.customDomain}
   package:
     # exclude everything
     # page handlers are automatically included by the plugin

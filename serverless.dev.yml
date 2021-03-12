@@ -1,0 +1,10 @@
+# serverless.yml
+
+resume-site: 
+  custom:
+    customDomain: 
+      domainName: '${sresume-sit:provider.stage}.tylerkennedy.dev'
+      certificateName: '*.tylerkennedy.dev'
+      basePath: ''
+      stage: ${resume-site:provider.stage}
+      createRoute53Record: true

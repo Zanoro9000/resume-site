@@ -1,5 +1,5 @@
-import App from './App'
+import Home from './home'
 
-export default function Home() {
-  return <App />
+export default function Index() {
+  return <Home />
 }

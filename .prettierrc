@@ -1,0 +1,9 @@
+{
+	"tabWidth": 2,
+	"useTabs": true,
+	"trailingComma": "es5",
+	"singleQuote": true,
+	"tsxSingleQuote": true,
+	"printWidth": 160,
+	"arrowParens": "always"
+}
