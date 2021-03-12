@@ -9,7 +9,7 @@ const email = 'tyken628@gmail.com';
 export default function Home() {
 	return (
 		<DefaultLayout>
-			<Image src="/images/headshot.jpg" height={256} width={256} alt="Tyler Kennedy" className={classes.headshot} />
+			<img src="/headshot.jpg" height={256} width={256} alt="Tyler Kennedy" className={classes.headshot} />
 
 			<h1 className={classes.title}>Tyler Kennedy</h1>
 
