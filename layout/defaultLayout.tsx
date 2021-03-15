@@ -19,19 +19,19 @@ export default function DefaultLayout(props) {
 					<span className={classes.headerLink}>Home</span>
 				</Link>
 				<Divider className={classes.verticalDivider} orientation="vertical" flexItem />
-				<Link href="/aboutme">
+				<Link href="/Aboutme">
 					<span className={classes.headerLink}>About Me</span>
 				</Link>
 				<Divider className={classes.verticalDivider} orientation="vertical" flexItem />
-				<Link href="/workexperience">
+				<Link href="/WorkExperience">
 					<span className={classes.headerLink}>Work Experience</span>
 				</Link>
 				<Divider className={classes.verticalDivider} orientation="vertical" flexItem />
-				<Link href="/projects">
+				<Link href="/Projects">
 					<span className={classes.headerLink}>Projects</span>
 				</Link>
 				<Divider className={classes.verticalDivider} orientation="vertical" flexItem />
-				<Link href="/blog">
+				<Link href="/Blog">
 					<span className={classes.headerLink}>Blog</span>
 				</Link>
 			</header>

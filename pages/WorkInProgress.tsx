@@ -1,5 +1,5 @@
 import React from 'react';
-import DefaultLayout from '../layout/defaultLayout';
+import DefaultLayout from '../layout/DefaultLayout';
 import classes from './generalStyles.module.css';
 
 export default function WorkInProgress() {
