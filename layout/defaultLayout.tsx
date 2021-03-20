@@ -19,7 +19,7 @@ export default function DefaultLayout(props) {
 					<span className={classes.headerLink}>Home</span>
 				</Link>
 				<Divider className={classes.verticalDivider} orientation="vertical" flexItem />
-				<Link href="/Aboutme">
+				<Link href="/AboutMe">
 					<span className={classes.headerLink}>About Me</span>
 				</Link>
 				<Divider className={classes.verticalDivider} orientation="vertical" flexItem />

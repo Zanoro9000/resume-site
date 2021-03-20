@@ -88,7 +88,7 @@ module.exports =
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = "CUYQ");
+/******/ 	return __webpack_require__(__webpack_require__.s = "BEvv");
 /******/ })
 /************************************************************************/
 /******/ ({
@@ -4080,30 +4080,7 @@ module.exports = _interopRequireDefault;
 
 /***/ }),
 
-/***/ "C+bE":
-/***/ (function(module, exports) {
-
-function _typeof(obj) {
-  "@babel/helpers - typeof";
-
-  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-    module.exports = _typeof = function _typeof(obj) {
-      return typeof obj;
-    };
-  } else {
-    module.exports = _typeof = function _typeof(obj) {
-      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    };
-  }
-
-  return _typeof(obj);
-}
-
-module.exports = _typeof;
-
-/***/ }),
-
-/***/ "CUYQ":
+/***/ "BEvv":
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4193,11 +4170,11 @@ var private_dot_next_react_loadable_manifest_json__WEBPACK_IMPORTED_MODULE_5___n
         rewrites: private_dot_next_routes_manifest_json__WEBPACK_IMPORTED_MODULE_3__.rewrites,
         i18n: undefined,
         page: "/_error",
-        buildId: "rJkdCIg4XQ3GwYTk5ziFz",
-        escapedBuildId: "rJkdCIg4XQ3GwYTk5ziFz",
+        buildId: "8Yk6xQ68iy3GDSePxP07f",
+        escapedBuildId: "8Yk6xQ68iy3GDSePxP07f",
         basePath: "",
         pageIsDynamic: false,
-        encodedPreviewProps: {previewModeId:"aa2f5836255059f4c91a7b46348ceec1",previewModeSigningKey:"b653c73c0a0838f60a68420da87d1f032a3e120d682988244766b6931200ac39",previewModeEncryptionKey:"f96ee974c009e7e17ae80b6d5059e61e8466c1269bf1664dbd8662223028bc85"},
+        encodedPreviewProps: {previewModeId:"a532961e1178c6713b2748f1f3b50829",previewModeSigningKey:"c35f543ce72ea6322e2eb07a78aa6216a65d4dfca6f1f757ebc10d69165e09f9",previewModeEncryptionKey:"6675144d258f14389e770cd494e4a8d29d602103027990f0999b5322b99da7c9"},
         experimental: {
           onError: next_plugin_loader_middleware_on_error_server___WEBPACK_IMPORTED_MODULE_1__["default"],
           initServer: next_plugin_loader_middleware_on_init_server___WEBPACK_IMPORTED_MODULE_0__["default"],
@@ -4205,6 +4182,29 @@ var private_dot_next_react_loadable_manifest_json__WEBPACK_IMPORTED_MODULE_5___n
       })
       
     
+
+/***/ }),
+
+/***/ "C+bE":
+/***/ (function(module, exports) {
+
+function _typeof(obj) {
+  "@babel/helpers - typeof";
+
+  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+    module.exports = _typeof = function _typeof(obj) {
+      return typeof obj;
+    };
+  } else {
+    module.exports = _typeof = function _typeof(obj) {
+      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+    };
+  }
+
+  return _typeof(obj);
+}
+
+module.exports = _typeof;
 
 /***/ }),
 
@@ -5640,7 +5640,7 @@ module.exports = function(module) {
 /***/ "LZ9C":
 /***/ (function(module) {
 
-module.exports = JSON.parse("{\"polyfillFiles\":[\"static/chunks/polyfills-4f4acd756cef4fe6da1b.js\"],\"devFiles\":[],\"ampDevFiles\":[],\"lowPriorityFiles\":[\"static/rJkdCIg4XQ3GwYTk5ziFz/_buildManifest.js\",\"static/rJkdCIg4XQ3GwYTk5ziFz/_ssgManifest.js\"],\"pages\":{\"/\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/index-5212c48ad497009fa7c1.js\"],\"/AboutMe\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/AboutMe-196ae1424efe685c6f13.js\"],\"/Blog\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/Blog-7a753e7f905160132728.js\"],\"/Home\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/Home-e16cf46e7a8b51f114c0.js\"],\"/Projects\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/Projects-e8ace3c5027c50fe844e.js\"],\"/WorkExperience\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/WorkExperience-552319682903c65d5f4b.js\"],\"/WorkInProgress\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.2d7ec735044271d9b333.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/WorkInProgress-73e7226b7bfd56b59a49.js\"],\"/_app\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/css/0a85aa376eccfcc6cb67.css\",\"static/chunks/pages/_app-2254e0f71c18ecc46868.js\"],\"/_error\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/pages/_error-dd81bd4fd3003b2b7bf0.js\"]},\"ampFirstPages\":[]}");
+module.exports = JSON.parse("{\"polyfillFiles\":[\"static/chunks/polyfills-4f4acd756cef4fe6da1b.js\"],\"devFiles\":[],\"ampDevFiles\":[],\"lowPriorityFiles\":[\"static/8Yk6xQ68iy3GDSePxP07f/_buildManifest.js\",\"static/8Yk6xQ68iy3GDSePxP07f/_ssgManifest.js\"],\"pages\":{\"/\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/index-00a129d3d848442c7dd5.js\"],\"/AboutMe\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/AboutMe-56c5e3dacef75cc2358f.js\"],\"/Blog\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/Blog-090ee8dfe80e09de7879.js\"],\"/Home\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/Home-98d9d5245ca71af97f75.js\"],\"/Projects\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/Projects-257572d73dabb48c4439.js\"],\"/WorkExperience\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/WorkExperience-bd84ac7b16f385d22178.js\"],\"/WorkInProgress\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/c30171032765ab6ddd29578636d2e3eaae05c98d.43644d5b97c8257b53c5.js\",\"static/css/2d3af52520287105aac2.css\",\"static/chunks/pages/WorkInProgress-17420868b0f528538fb1.js\"],\"/_app\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/css/0a85aa376eccfcc6cb67.css\",\"static/chunks/pages/_app-2254e0f71c18ecc46868.js\"],\"/_error\":[\"static/chunks/main-e46c0efa28359482f5d0.js\",\"static/chunks/webpack-50bee04d1dc61f8adf5b.js\",\"static/chunks/framework.b016d4fb439133c9e4f3.js\",\"static/chunks/commons.87cca3ab8a9cdfb2ffcb.js\",\"static/chunks/pages/_error-dd81bd4fd3003b2b7bf0.js\"]},\"ampFirstPages\":[]}");
 
 /***/ }),
 
